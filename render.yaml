@@ -1,0 +1,29 @@
+# Blueprint de Render: https://render.com/docs/blueprint-spec
+# Render → New → Blueprint → seleccione este repositorio.
+services:
+  - type: web
+    name: sistema-prestamos
+    runtime: docker
+    plan: free
+    healthCheckPath: /health.php
+    envVars:
+      # Datos de su base de datos MySQL externa (Aiven, TiDB Cloud, etc.)
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASS
+        sync: false
+      - key: DB_SSL
+        value: "1"
+      # Clave que pide el instalador (/install/). Render la genera; véala en Environment.
+      - key: INSTALL_KEY
+        generateValue: true
+      - key: TRUST_PROXY
+        value: "1"
+      - key: APP_TIMEZONE
+        value: America/Santo_Domingo

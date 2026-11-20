@@ -1,0 +1,10 @@
+.git
+.gitignore
+Dockerfile
+.dockerignore
+render.yaml
+config/config.php
+config/install.lock
+uploads/clientes/*
+uploads/logo/*
+*.md

@@ -38,7 +38,7 @@ if (is_post()) {
             db_update('clientes', $row, $id);
             [$a, $d] = audit_diff($cliente, $row);
             audit('editar', 'clientes', (string)$id, "Edición de cliente {$row['nombres']} {$row['apellidos']}", $a, $d);
-            if ($foto && $cliente['foto'] && is_file(APP_ROOT . '/' . $cliente['foto'])) @unlink(APP_ROOT . '/' . $cliente['foto']);
+            if ($foto) image_delete($cliente['foto']);
             flash('success', 'Cliente actualizado.');
         } else {
             $row['creado_por'] = current_user()['id'];

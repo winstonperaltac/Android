@@ -1,29 +1,50 @@
 <?php
 /**
- * Instalador web: crea config/config.php, las tablas y el usuario administrador.
- * Una vez instalado se bloquea (config/install.lock).
+ * Instalador web: crea las tablas y el usuario administrador.
+ *  - Hosting tradicional: pide los datos de MySQL y escribe config/config.php.
+ *  - Render / Docker: toma los datos de MySQL de las variables de entorno (DB_HOST, ...)
+ *    y exige la clave INSTALL_KEY para evitar que un tercero instale primero.
+ * Se bloquea si ya existe config/install.lock o si la base de datos ya tiene usuarios.
  */
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
+require $root . '/includes/env_config.php';
 $lock = $root . '/config/install.lock';
 $errors = [];
 $done = false;
+$envConfig = file_exists($root . '/config/config.php') ? null : config_from_env();
+$installKey = env_get('INSTALL_KEY');
 
-if (file_exists($lock)) {
-    exit('<h3 style="font-family:sans-serif">El sistema ya está instalado. Elimine config/install.lock para reinstalar.</h3>');
+$yaInstalado = file_exists($lock);
+if (!$yaInstalado && $envConfig) {
+    try {
+        $c = $envConfig['db'];
+        $pdoChk = new PDO("mysql:host={$c['host']};port={$c['port']};dbname={$c['name']};charset=utf8mb4", $c['user'], $c['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION] + pdo_ssl_options($c));
+        $yaInstalado = (int)$pdoChk->query('SELECT COUNT(*) FROM usuarios')->fetchColumn() > 0;
+    } catch (PDOException $e) {
+        if (strpos($e->getMessage(), '1146') === false) {
+            $errors[] = 'No se pudo conectar a la base de datos configurada en las variables de entorno: ' . $e->getMessage();
+        }
+    }
+}
+if ($yaInstalado) {
+    exit('<h3 style="font-family:sans-serif">El sistema ya está instalado. <a href="../login.php">Ir al inicio de sesión</a></h3>');
 }
 
 function v(string $k, string $d = ''): string { return htmlspecialchars((string)($_POST[$k] ?? $d), ENT_QUOTES, 'UTF-8'); }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $db = [
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (!$errors || !$envConfig)) {
+    $db = $envConfig ? $envConfig['db'] : [
         'host' => trim($_POST['db_host'] ?? 'localhost'),
         'port' => (int)($_POST['db_port'] ?? 3306),
         'name' => trim($_POST['db_name'] ?? ''),
         'user' => trim($_POST['db_user'] ?? ''),
         'pass' => (string)($_POST['db_pass'] ?? ''),
     ];
+    if ($envConfig && (!$installKey || !hash_equals($installKey, (string)($_POST['install_key'] ?? '')))) {
+        $errors[] = $installKey ? 'La clave de instalación (INSTALL_KEY) no es correcta.' : 'Defina la variable de entorno INSTALL_KEY para poder instalar.';
+    }
     $empresa = trim($_POST['empresa'] ?? '');
     $adminUser = trim($_POST['admin_user'] ?? '');
     $adminName = trim($_POST['admin_name'] ?? '');
@@ -33,11 +54,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!preg_match('/^[a-zA-Z0-9_.-]{3,50}$/', $adminUser)) $errors[] = 'El usuario administrador debe tener 3-50 caracteres (letras, números, . _ -).';
     if (strlen($adminPass) < 8) $errors[] = 'La contraseña del administrador debe tener al menos 8 caracteres.';
     if ($adminName === '') $errors[] = 'Indique el nombre del administrador.';
-    if (!is_writable($root . '/config')) $errors[] = 'La carpeta config/ no tiene permisos de escritura.';
+    if (!$envConfig && !is_writable($root . '/config')) $errors[] = 'La carpeta config/ no tiene permisos de escritura.';
 
     if (!$errors) {
         try {
-            $pdo = new PDO("mysql:host={$db['host']};port={$db['port']};charset=utf8mb4", $db['user'], $db['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+            $pdo = new PDO("mysql:host={$db['host']};port={$db['port']};charset=utf8mb4", $db['user'], $db['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION] + pdo_ssl_options($db));
             try {
                 $pdo->exec('CREATE DATABASE IF NOT EXISTS `' . str_replace('`', '', $db['name']) . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
             } catch (PDOException $e) {
@@ -59,6 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare('INSERT INTO auditoria (usuario, accion, modulo, descripcion, ip) VALUES (?,?,?,?,?)')
                 ->execute([$adminUser, 'instalar', 'sistema', 'Instalación del sistema', $_SERVER['REMOTE_ADDR'] ?? '']);
 
+            if (!$envConfig) {
             $config = [
                 'db' => $db,
                 'timezone' => $_POST['timezone'] ?? 'America/Santo_Domingo',
@@ -69,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             file_put_contents($root . '/config/config.php', $php);
             @chmod($root . '/config/config.php', 0640);
             file_put_contents($lock, date('c'));
+            }
             $done = true;
         } catch (Throwable $e) {
             $errors[] = 'Error: ' . $e->getMessage();
@@ -88,6 +111,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <?php else: ?>
     <?php foreach ($errors as $er): ?><div class="alert alert-danger"><?= htmlspecialchars($er) ?></div><?php endforeach; ?>
     <form method="post" class="card card-body">
+      <?php if ($envConfig): ?>
+      <div class="alert alert-info">Base de datos tomada de las variables de entorno: <strong><?= htmlspecialchars($envConfig['db']['user'] . '@' . $envConfig['db']['host'] . '/' . $envConfig['db']['name']) ?></strong><?= $envConfig['db']['ssl'] ? ' (SSL)' : '' ?></div>
+      <div class="mb-3"><label class="form-label">Clave de instalación (variable INSTALL_KEY)</label><input name="install_key" type="password" class="form-control" required></div>
+      <?php else: ?>
       <h5>Base de datos MySQL</h5>
       <div class="row g-2 mb-3">
         <div class="col-md-8"><label class="form-label">Servidor</label><input name="db_host" class="form-control" value="<?= v('db_host', 'localhost') ?>"></div>
@@ -96,6 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="col-md-4"><label class="form-label">Usuario</label><input name="db_user" class="form-control" value="<?= v('db_user') ?>" required></div>
         <div class="col-md-4"><label class="form-label">Contraseña</label><input name="db_pass" type="password" class="form-control"></div>
       </div>
+      <?php endif; ?>
       <h5>Empresa</h5>
       <div class="row g-2 mb-3">
         <div class="col-md-8"><label class="form-label">Nombre de la empresa</label><input name="empresa" class="form-control" value="<?= v('empresa') ?>"></div>

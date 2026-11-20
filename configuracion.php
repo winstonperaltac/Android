@@ -32,12 +32,12 @@ if (is_post()) {
             }
             $nuevos[$k] = mb_substr($v, 0, 255);
         }
-        $logo = upload_image('logo', 'logo', 1048576);
+        $logo = upload_image('logo', 'logo', 2097152, true, 400);
         if ($logo) {
-            $old = setting('empresa_logo');
-            if ($old && is_file(APP_ROOT . '/' . $old)) @unlink(APP_ROOT . '/' . $old);
+            image_delete(setting('empresa_logo'));
             $nuevos['empresa_logo'] = $logo;
         } elseif (isset($_POST['quitar_logo'])) {
+            image_delete(setting('empresa_logo'));
             $nuevos['empresa_logo'] = '';
         }
         foreach ($nuevos as $k => $v) setting_save($k, $v);
@@ -61,7 +61,7 @@ require __DIR__ . '/includes/header.php';
       <div class="col-md-3"><label class="form-label small"><?= e($campos[$k]) ?></label><input name="<?= $k ?>" class="form-control form-control-sm" value="<?= e(setting($k, '')) ?>"></div>
     <?php endforeach; ?>
     <div class="col-md-6"><label class="form-label small"><?= e($campos['empresa_direccion']) ?></label><input name="empresa_direccion" class="form-control form-control-sm" value="<?= e(setting('empresa_direccion', '')) ?>"></div>
-    <div class="col-md-6"><label class="form-label small">Logo (máx. 1 MB)</label>
+    <div class="col-md-6"><label class="form-label small">Logo (máx. 2 MB)</label>
       <div class="d-flex gap-2 align-items-center">
         <?php if (setting('empresa_logo')): ?><img src="<?= e(setting('empresa_logo')) ?>" style="max-height:48px" alt="Logo"><?php endif; ?>
         <input type="file" name="logo" accept="image/*" class="form-control form-control-sm">

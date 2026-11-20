@@ -8,7 +8,7 @@ Aplicación web para administrar una financiera de préstamos: clientes, présta
 - MySQL 5.7+ o MariaDB 10.3+
 - Apache con `.htaccess` (recomendado) o cualquier servidor que ejecute PHP
 
-## Instalación
+## Instalación en hosting compartido (cPanel)
 
 1. Suba todos los archivos a su hosting (por ejemplo a `public_html/prestamos`).
 2. Cree una base de datos MySQL vacía desde el panel (cPanel → MySQL Databases).
@@ -17,6 +17,19 @@ Aplicación web para administrar una financiera de préstamos: clientes, présta
 5. Dé permisos de escritura a `uploads/` y `config/` (normalmente 755).
 
 Si prefiere instalar a mano, copie `config/config.example.php` como `config/config.php`, importe `install/schema.sql` y cree el usuario administrador en la tabla `usuarios`, con la contraseña generada por `password_hash()` y el rol `admin`.
+
+## Instalación en Render (onrender.com)
+
+Render no ejecuta PHP directamente, así que el sistema se despliega como contenedor **Docker** (incluye `Dockerfile` y `render.yaml`). Render tampoco ofrece MySQL, de modo que la base de datos va en un proveedor externo. Las fotos y el logo se guardan **dentro de la base de datos**, porque el disco de Render se borra en cada despliegue.
+
+1. **Base de datos MySQL gratuita**: cree un servicio MySQL en [Aiven](https://aiven.io) o [TiDB Cloud](https://tidbcloud.com) (ambos tienen plan gratuito) y anote el host, puerto, base de datos, usuario y contraseña. Estos proveedores exigen conexión cifrada (por eso `DB_SSL=1`).
+2. En Render: **New → Blueprint** y seleccione este repositorio. Render leerá `render.yaml` y pedirá `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` y `DB_PASS`.
+3. Cuando termine el despliegue, abra `https://SU-SERVICIO.onrender.com/install/`. Escriba la clave **INSTALL_KEY** (en Render: su servicio → *Environment* → ver el valor generado), el nombre de la empresa y el usuario administrador.
+4. Entre por `https://SU-SERVICIO.onrender.com/`.
+
+Variables de entorno disponibles: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_SSL`, `INSTALL_KEY`, `APP_TIMEZONE`, `SESSION_TIMEOUT`, `APP_DEBUG`, `TRUST_PROXY`.
+
+> En el plan gratuito de Render el servicio se "duerme" tras unos minutos sin visitas y la primera carga después tarda cerca de un minuto. Para uso real conviene un plan de pago.
 
 ## Reglas de negocio
 

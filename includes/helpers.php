@@ -104,13 +104,22 @@ function csrf_check(): void
 
 function client_ip(): string
 {
-    return substr($_SERVER['REMOTE_ADDR'] ?? '', 0, 45);
+    global $CONFIG;
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    // Detrás de un proxy (Render, Cloudflare...) la IP real viene en X-Forwarded-For
+    if (!empty($CONFIG['trust_proxy']) && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $ip = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+    }
+    return substr($ip, 0, 45);
 }
 
 /**
- * Sube una imagen de forma segura. Devuelve la ruta relativa o null.
+ * Sube una imagen de forma segura y la guarda en la base de datos
+ * (así no se pierde en servidores con disco temporal como Render).
+ * La imagen se redimensiona a un máximo de $maxLado píxeles.
+ * Devuelve la referencia ("imagen.php?id=N") para usar como src, o null.
  */
-function upload_image(string $field, string $subdir, int $maxBytes = 3145728): ?string
+function upload_image(string $field, string $subdir, int $maxBytes = 5242880, bool $publico = false, int $maxLado = 800): ?string
 {
     if (empty($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) {
         return null;
@@ -120,22 +129,45 @@ function upload_image(string $field, string $subdir, int $maxBytes = 3145728): ?
         throw new RuntimeException('Error al subir el archivo.');
     }
     if ($f['size'] > $maxBytes) {
-        throw new RuntimeException('La imagen excede el tamaño máximo permitido (3 MB).');
+        throw new RuntimeException('La imagen excede el tamaño máximo permitido (' . round($maxBytes / 1048576) . ' MB).');
     }
     $info = @getimagesize($f['tmp_name']);
-    $allowed = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_GIF => 'gif', IMAGETYPE_WEBP => 'webp'];
-    if (!$info || !isset($allowed[$info[2]])) {
+    $loaders = [IMAGETYPE_JPEG => 'imagecreatefromjpeg', IMAGETYPE_PNG => 'imagecreatefrompng', IMAGETYPE_GIF => 'imagecreatefromgif', IMAGETYPE_WEBP => 'imagecreatefromwebp'];
+    if (!$info || !isset($loaders[$info[2]]) || !function_exists($loaders[$info[2]])) {
         throw new RuntimeException('El archivo debe ser una imagen JPG, PNG, GIF o WEBP.');
     }
-    $name = bin2hex(random_bytes(12)) . '.' . $allowed[$info[2]];
-    $dir = APP_ROOT . '/uploads/' . $subdir;
-    if (!is_dir($dir)) {
-        mkdir($dir, 0755, true);
+    $src = @$loaders[$info[2]]($f['tmp_name']);
+    if (!$src) throw new RuntimeException('No se pudo leer la imagen.');
+    [$w, $h] = [imagesx($src), imagesy($src)];
+    $esc = min(1, $maxLado / max($w, $h));
+    $nw = max(1, (int)round($w * $esc)); $nh = max(1, (int)round($h * $esc));
+    $dst = imagecreatetruecolor($nw, $nh);
+    $conAlfa = in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP], true);
+    if ($conAlfa) {
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        imagefill($dst, 0, 0, imagecolorallocatealpha($dst, 0, 0, 0, 127));
     }
-    if (!move_uploaded_file($f['tmp_name'], $dir . '/' . $name)) {
-        throw new RuntimeException('No se pudo guardar la imagen.');
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    ob_start();
+    if ($conAlfa) { imagepng($dst, null, 8); $mime = 'image/png'; }
+    else { imagejpeg($dst, null, 85); $mime = 'image/jpeg'; }
+    $datos = ob_get_clean();
+    imagedestroy($src); imagedestroy($dst);
+
+    $id = db_insert('imagenes', ['categoria' => $subdir, 'mime' => $mime, 'datos' => $datos, 'publico' => $publico ? 1 : 0]);
+    return 'imagen.php?id=' . $id;
+}
+
+/** Elimina una imagen guardada (en base de datos o, en instalaciones antiguas, en disco). */
+function image_delete(?string $ref): void
+{
+    if (!$ref) return;
+    if (preg_match('/^imagen\.php\?id=(\d+)$/', $ref, $m)) {
+        q('DELETE FROM imagenes WHERE id = ?', [(int)$m[1]]);
+    } elseif (strpos($ref, 'uploads/') === 0 && is_file(APP_ROOT . '/' . $ref)) {
+        @unlink(APP_ROOT . '/' . $ref);
     }
-    return 'uploads/' . $subdir . '/' . $name;
 }
 
 /** Suma días a una fecha Y-m-d. */

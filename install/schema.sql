@@ -237,6 +237,16 @@ CREATE TABLE IF NOT EXISTS auditoria (
   INDEX idx_aud_modulo (modulo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------- Imágenes (fotos de clientes y logo) guardadas en la base de datos ----------
+CREATE TABLE IF NOT EXISTS imagenes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  categoria VARCHAR(30) NOT NULL,
+  mime VARCHAR(40) NOT NULL,
+  datos MEDIUMBLOB NOT NULL,
+  publico TINYINT(1) NOT NULL DEFAULT 0,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ---------- Datos iniciales ----------
