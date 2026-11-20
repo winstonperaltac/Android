@@ -23,11 +23,11 @@ Si prefiere instalar a mano, copie `config/config.example.php` como `config/conf
 Render no ejecuta PHP directamente, así que el sistema se despliega como contenedor **Docker** (incluye `Dockerfile` y `render.yaml`). Render tampoco ofrece MySQL, de modo que la base de datos va en un proveedor externo. Las fotos y el logo se guardan **dentro de la base de datos**, porque el disco de Render se borra en cada despliegue.
 
 1. **Base de datos MySQL gratuita**: cree un servicio MySQL en [Aiven](https://aiven.io) o [TiDB Cloud](https://tidbcloud.com) (ambos tienen plan gratuito) y anote el host, puerto, base de datos, usuario y contraseña. Estos proveedores exigen conexión cifrada (por eso `DB_SSL=1`).
-2. En Render: **New → Blueprint** y seleccione este repositorio. Render leerá `render.yaml` y pedirá `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` y `DB_PASS`.
+2. En Render: **New → Blueprint** y seleccione este repositorio. Render leerá `render.yaml` y pedirá `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` y `DB_SSL_CA` (pegue completo el certificado CA del proveedor; en Aiven es el *CA certificate*, desde `-----BEGIN CERTIFICATE-----` hasta `-----END CERTIFICATE-----`).
 3. Cuando termine el despliegue, abra `https://SU-SERVICIO.onrender.com/install/`. Escriba la clave **INSTALL_KEY** (en Render: su servicio → *Environment* → ver el valor generado), el nombre de la empresa y el usuario administrador.
 4. Entre por `https://SU-SERVICIO.onrender.com/`.
 
-Variables de entorno disponibles: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_SSL`, `INSTALL_KEY`, `APP_TIMEZONE`, `SESSION_TIMEOUT`, `APP_DEBUG`, `TRUST_PROXY`.
+Variables de entorno disponibles: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_SSL`, `DB_SSL_CA`, `INSTALL_KEY`, `APP_TIMEZONE`, `SESSION_TIMEOUT`, `APP_DEBUG`, `TRUST_PROXY`.
 
 > En el plan gratuito de Render el servicio se "duerme" tras unos minutos sin visitas y la primera carga después tarda cerca de un minuto. Para uso real conviene un plan de pago.
 

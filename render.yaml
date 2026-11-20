@@ -20,6 +20,9 @@ services:
         sync: false
       - key: DB_SSL
         value: "1"
+      # Certificado CA del proveedor (Aiven: "CA certificate"), pegado completo
+      - key: DB_SSL_CA
+        sync: false
       # Clave que pide el instalador (/install/). Render la genera; véala en Environment.
       - key: INSTALL_KEY
         generateValue: true

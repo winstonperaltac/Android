@@ -3,6 +3,7 @@
  * Configuración desde variables de entorno (Render, Docker, etc.).
  * Si existe config/config.php tiene prioridad; si no, se usan estas variables:
  *   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, DB_SSL (1 = conexión cifrada),
+ *   DB_SSL_CA (certificado CA en formato PEM, p. ej. el "CA certificate" de Aiven),
  *   APP_TIMEZONE, SESSION_TIMEOUT, APP_DEBUG, TRUST_PROXY
  */
 declare(strict_types=1);
@@ -25,6 +26,7 @@ function config_from_env(): ?array
             'user' => env_get('DB_USER', ''),
             'pass' => env_get('DB_PASS', ''),
             'ssl'  => in_array(strtolower((string)env_get('DB_SSL', '0')), ['1', 'true', 'yes', 'si', 'sí'], true),
+            'ssl_ca' => env_ca_file(env_get('DB_SSL_CA')),
         ],
         'timezone' => env_get('APP_TIMEZONE', 'America/Santo_Domingo'),
         'session_timeout' => (int)env_get('SESSION_TIMEOUT', '3600'),
@@ -32,6 +34,33 @@ function config_from_env(): ?array
         'trust_proxy' => env_get('TRUST_PROXY', '0') === '1',
         'from_env' => true,
     ];
+}
+
+/**
+ * Convierte el certificado CA recibido en una variable de entorno en un archivo temporal.
+ * Acepta el texto PEM completo o una ruta a un archivo existente.
+ */
+function env_ca_file(?string $ca): ?string
+{
+    if (!$ca) return null;
+    if (strpos($ca, 'BEGIN CERTIFICATE') === false) {
+        return is_readable($ca) ? $ca : null;
+    }
+    // Se reconstruye el PEM aunque el panel haya convertido los saltos de línea en espacios o "\n" literales
+    $pem = '';
+    if (preg_match_all('/-----BEGIN CERTIFICATE-----(.+?)-----END CERTIFICATE-----/s', str_replace('\\n', "\n", $ca), $m)) {
+        foreach ($m[1] as $b64) {
+            $b64 = preg_replace('/[^A-Za-z0-9+\/=]/', '', $b64);
+            $pem .= "-----BEGIN CERTIFICATE-----\n" . chunk_split($b64, 64, "\n") . "-----END CERTIFICATE-----\n";
+        }
+    }
+    if ($pem === '') return null;
+    $file = sys_get_temp_dir() . '/db-ca-' . md5($pem) . '.pem';
+    if (!is_file($file)) {
+        file_put_contents($file, $pem);
+        @chmod($file, 0644);
+    }
+    return $file;
 }
 
 /** Carga la configuración: archivo config.php o variables de entorno. */
