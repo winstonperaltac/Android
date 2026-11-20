@@ -18,6 +18,8 @@ RUN a2enmod headers rewrite \
  && a2enconf servername
 
 COPY docker/php.ini /usr/local/etc/php/conf.d/zz-app.ini
+COPY docker/apache-proxy.conf /etc/apache2/conf-available/proxy-redirects.conf
+RUN a2enconf proxy-redirects
 COPY --chown=www-data:www-data . /var/www/html/
 
 ENV PORT=10000 \

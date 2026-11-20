@@ -27,7 +27,9 @@ Render no ejecuta PHP directamente, así que el sistema se despliega como conten
 3. Cuando termine el despliegue, abra `https://SU-SERVICIO.onrender.com/install/`. Escriba la clave **INSTALL_KEY** (en Render: su servicio → *Environment* → ver el valor generado), el nombre de la empresa y el usuario administrador.
 4. Entre por `https://SU-SERVICIO.onrender.com/`.
 
-Variables de entorno disponibles: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_SSL`, `DB_SSL_CA`, `INSTALL_KEY`, `APP_TIMEZONE`, `SESSION_TIMEOUT`, `APP_DEBUG`, `TRUST_PROXY`.
+Variables de entorno disponibles: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_SSL`, `DB_SSL_CA`, `DB_SSL_VERIFY` (1 = exigir verificación del certificado), `INSTALL_KEY`, `APP_TIMEZONE`, `SESSION_TIMEOUT`, `APP_DEBUG`, `TRUST_PROXY`.
+
+> Si `DB_SSL_CA` no está definido o no es válido, la conexión igual va **cifrada** pero sin verificar el certificado del servidor (como `ssl-mode=REQUIRED` de Aiven). El instalador muestra qué modo se está usando.
 
 > En el plan gratuito de Render el servicio se "duerme" tras unos minutos sin visitas y la primera carga después tarda cerca de un minuto. Para uso real conviene un plan de pago.
 

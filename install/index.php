@@ -24,7 +24,11 @@ if (!$yaInstalado && $envConfig) {
         $yaInstalado = (int)$pdoChk->query('SELECT COUNT(*) FROM usuarios')->fetchColumn() > 0;
     } catch (PDOException $e) {
         if (strpos($e->getMessage(), '1146') === false) {
-            $errors[] = 'No se pudo conectar a la base de datos configurada en las variables de entorno: ' . $e->getMessage();
+            $msg = 'No se pudo conectar a la base de datos configurada en las variables de entorno: ' . $e->getMessage();
+            if (stripos($e->getMessage(), 'SSL') !== false && !empty($c['ssl_ca'])) {
+                $msg .= '. El certificado de DB_SSL_CA no corresponde a este servidor: cópielo de nuevo desde Aiven ("CA certificate") o borre la variable DB_SSL_CA para conectar cifrado sin verificar.';
+            }
+            $errors[] = $msg;
         }
     }
 }
@@ -112,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (!$errors || !$envConfig)) {
     <?php foreach ($errors as $er): ?><div class="alert alert-danger"><?= htmlspecialchars($er) ?></div><?php endforeach; ?>
     <form method="post" class="card card-body">
       <?php if ($envConfig): ?>
-      <div class="alert alert-info">Base de datos tomada de las variables de entorno: <strong><?= htmlspecialchars($envConfig['db']['user'] . '@' . $envConfig['db']['host'] . '/' . $envConfig['db']['name']) ?></strong><?= $envConfig['db']['ssl'] ? ' (SSL)' : '' ?></div>
+      <div class="alert alert-info">Base de datos tomada de las variables de entorno: <strong><?= htmlspecialchars($envConfig['db']['user'] . '@' . $envConfig['db']['host'] . '/' . $envConfig['db']['name']) ?></strong><br><small>Conexión: <?= htmlspecialchars(db_ssl_estado($envConfig['db'])) ?></small></div>
       <div class="mb-3"><label class="form-label">Clave de instalación (variable INSTALL_KEY)</label><input name="install_key" type="password" class="form-control" required></div>
       <?php else: ?>
       <h5>Base de datos MySQL</h5>
